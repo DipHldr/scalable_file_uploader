@@ -1,1 +1,68 @@
 import {Worker} from 'bullmq';
+import IORedis from 'ioredis';
+import { exec,spawn } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import {ffmpeg_args} from './constants.js';
+
+const connection=new IORedis({maxRetriesPerRequest:null});
+const worker=new Worker('video-processing',async(job)=>{
+    // console.log(job);
+
+    const videoId=job.data.name.split('.')[0];
+    const inputPath=job.data.file;
+    const outputPath=`processed/${videoId}`;
+    const playlistUrl=`http://localhost:3000/videos/${videoId}/index.m3u8`;
+
+    //0->1080 1->720 2->480
+    if (!fs.existsSync(outputPath)) {
+        fs.mkdirSync(`${outputPath}/0`, { recursive: true });
+        fs.mkdirSync(`${outputPath}/1`, { recursive: true });
+        fs.mkdirSync(`${outputPath}/2`, { recursive: true });
+    }
+
+    return new Promise((resolve,reject)=>{
+
+        const ffmpegProcess=spawn('ffmpeg',ffmpeg_args(inputPath,outputPath));
+
+
+        // console.log('test ->\n',ffmpegProcess.stderr);
+        // Capturing stderr to track progress
+        ffmpegProcess.stderr.on('data',(data)=>{
+            const output=data.toString();
+            console.log(output);
+            //FFmpeg sends strings like "time=00:00:15.24"
+            //using regex to get timestamp
+            const timeMatch = output.match(/time=(\d{2}:\d{2}:\d{2}.\d{2})/);
+            if (timeMatch) {
+                const elapsed = timeMatch[1];
+                console.log(`[Job ${job.id}] Progress: ${elapsed}`);
+                
+                //updating the BullMQ progress here
+                job.updateProgress({ time: elapsed });
+            }
+
+        });
+        //Handling process completion
+        ffmpegProcess.on('close', (code) => {
+            if (code === 0) {
+                console.log('FFmpeg finished successfully');
+                resolve({ 
+                    status: 'success',
+                    message:'video successfully processed',
+                    playlisturl:playlistUrl 
+                });
+            } else {
+                reject(new Error(`FFmpeg exited with code ${code}`));
+            }
+        });
+
+        //Handling process errors (like "ffmpeg not found")
+        ffmpegProcess.on('error', (err) => {
+            reject(err);
+        });
+
+    });
+
+
+},{connection})

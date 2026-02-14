@@ -45,7 +45,7 @@ const upload=multer({
 });
 
 
-app.use('/api/v1/upload',upload.single('video'),async(req,res)=>{
+app.post('/api/v1/upload',upload.single('video'),async(req,res)=>{
     if(!req.file){
         return res.status(201).json({message:'failed to upload file'});
     }

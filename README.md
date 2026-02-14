@@ -4,17 +4,17 @@ A robust, production-ready system designed to handle large-scale video ingestion
 
 
 
-## 🚀 Features
+## Features
 
 * **Resumable Chunks:** Uses the TUS protocol to resume uploads after network failure.
-* **Multipart Uploads:** Directly streams large files to cloud storage (S3/GCP) to bypass server memory limits.
+* **Multipart Uploads:** Directly streams large files to storage.
 * **Worker-Based Transcoding:** Decouples uploading from processing using a message queue.
 * **Horizontal Scalability:** Stateless API design allows for easy scaling via Kubernetes or ECS.
 * **Progress Tracking:** Real-time feedback via WebSockets or polling.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 The system follows a microservices-oriented flow to ensure that a 4k video upload doesn't block your entire API:
 
@@ -26,7 +26,7 @@ The system follows a microservices-oriented flow to ensure that a 4k video uploa
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology |
 | :--- | :--- |
@@ -34,16 +34,54 @@ The system follows a microservices-oriented flow to ensure that a 4k video uploa
 | **Queue** | Redis + BullMQ  |
 | **Storage** |Used local storage for now |
 | **Processing** | FFmpeg |
-| **Database** | PostgreSQL|
 
 ---
 
-## ⚙️ Getting Started
+---
+
+## The Transcoding Pipeline (ABR)
+
+To provide a YouTube-like experience, this project implements **Adaptive Bitrate Streaming (ABR)**. Instead of serving a single MP4, we transform the source into an HLS (HTTP Live Streaming) format.
+
+
+
+* **Multi-Resolution Scaling:** Using a single-pass `filter_complex`, we split the input into 1080p, 720p, and 480p streams.
+* **Mathematical Constraints:** Implemented scaling logic (`scale=w=trunc(oh*a/2)*2`) to ensure all dimensions are even, satisfying H.264 encoder requirements.
+* **HLS Segmentation:** Slices video into 10-second `.ts` chunks, enabling users to jump to any part of the video instantly without downloading the whole file.
+
+---
+
+## Distributed Worker Logic
+
+The system is designed to be **fault-tolerant** and **memory-efficient**:
+
+* **BullMQ State Machine:** Jobs move through `Waiting -> Active -> Completed/Failed` states. If a worker crashes, BullMQ detects the "stalled" job and re-queues it.
+* **Stream-Based Processing:** We use Node.js `spawn` rather than `exec`. This allows us to pipe FFmpeg's `stderr` to track progress in real-time while maintaining a flat memory footprint (no RAM buffering).
+* **Atomic Retries:** Configured with exponential backoff to handle transient issues like file-system locks or temporary CPU spikes.
+
+
+
+---
+
+## Database Schema
+
+| Table | Column | Type | Description |
+| :--- | :--- | :--- | :--- |
+| **Videos** | `id` | UUID | Primary key for the video |
+| | `status` | Enum | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` |
+| | `path` | String | Location of the original raw file |
+| **Jobs** | `job_id` | String | The ID returned by BullMQ/Redis |
+| | `progress` | Integer | 0-100 percentage tracking |
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-* Docker & Docker Compose
 * Node.js (v18+) or your preferred runtime
+* FFmpeg 
+* docker
 
 ### Installation
 
@@ -51,12 +89,14 @@ The system follows a microservices-oriented flow to ensure that a 4k video uploa
    ```bash
    git clone [https://github.com/your-username/scalable-video-uploader.git](https://github.com/your-username/scalable-video-uploader.git)
    cd scalable-video-uploader
-
-## 🤝 Contributing
+   ```
+## Command to Run The Project
+``` bash
+docker run --name < any name > -p 6379:6379 -d redis
+npm run start
+```
+## Contributing
 * Contributions are welcome!
 
-## 📄 License
+## License
 * Distributed under the MIT License. See LICENSE for more information.
-
-
-* **Would you like me to write the `docker-compose.yml` file to go along with this?**
