@@ -90,9 +90,10 @@ The system is designed to be **fault-tolerant** and **memory-efficient**:
    git clone [https://github.com/your-username/scalable-video-uploader.git](https://github.com/your-username/scalable-video-uploader.git)
    cd scalable-video-uploader
    ```
-## Command to Run The Project
+## Run The Project
 ``` bash
 docker run --name < any name > -p 6379:6379 -d redis
+npm install
 npm run start
 ```
 ## Contributing
