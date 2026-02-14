@@ -53,7 +53,7 @@ The system follows a microservices-oriented flow to ensure that a 4k video uploa
    cd scalable-video-uploader
 
 ## 🤝 Contributing
-* Contributions are welcome! Please see the CONTRIBUTING.md for guidelines on how to submit pull requests, report issues, or suggest new features.
+* Contributions are welcome!
 
 ## 📄 License
 * Distributed under the MIT License. See LICENSE for more information.

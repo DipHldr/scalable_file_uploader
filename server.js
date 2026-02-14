@@ -5,15 +5,17 @@ import morgan from 'morgan';
 import fs from 'fs';
 import path from 'path';
 import {v4 as uuidv4} from 'uuid'
+import cors from 'cors';
 import {Queue} from 'bullmq';
+const PORT=3000
 
 const app=express();
-app.use(express.static());
+app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(cors())
 app.use(helmet())
-app.use(morgan())
+app.use(morgan('dev'))
 
 //connection to bullmq redis
 const videoQueue=new Queue('video-processing',{
@@ -27,7 +29,7 @@ const videoQueue=new Queue('video-processing',{
 const storage=multer.diskStorage({
     destination:(req,file,cb)=>{
         const uploadPath='./upload'
-        if(!fs.exixtsSync(uploadPath)) fs.mkdirSync(uploadPath);
+        if(!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
         cb(null,uploadPath);
     },
     filename:(req,file,cb)=>{
@@ -52,7 +54,7 @@ app.use('/api/v1/upload',upload.single('video'),async(req,res)=>{
 
     await videoQueue.add('transcoder',{
         file:req.file.path,
-        name:req.file.name
+        name:req.file.filename
     },{
         attempts:3,
         backoff:1000
