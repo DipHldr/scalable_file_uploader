@@ -1,9 +1,11 @@
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 //multer configuration
 export const storage=multer.diskStorage({
     destination:(req,file,cb)=>{
         const uploadPath='./upload'
-        if(!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
+        if(!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath,{recursive:true});
         cb(null,uploadPath);
     },
     filename:(req,file,cb)=>{

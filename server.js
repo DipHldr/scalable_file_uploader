@@ -16,7 +16,7 @@ app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(cors())
-app.use(helmet())
+// app.use(helmet())
 app.use(morgan('dev'))
 
 //connection to bullmq redis
@@ -28,7 +28,10 @@ const videoQueue=new Queue('video-processing',{
 });
 
 app.post('/api/v1/upload',upload.single('video'),async(req,res)=>{
-    if(!req.file){
+    console.log("Hello from server\n");
+
+    try {
+        if(!req.file){
         return res.status(400).json({message:'failed to upload file'});
     }
 
@@ -55,6 +58,16 @@ app.post('/api/v1/upload',upload.single('video'),async(req,res)=>{
             size:req.file.size,
         }
     });
+        
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message:"Error",
+            error:error
+        });
+        
+    }
+    
 });
 
 app.listen(PORT,()=>{

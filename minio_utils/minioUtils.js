@@ -1,4 +1,4 @@
-import { minioClient,BUCKET_NAME } from "./minioSetup";
+import { minioClient,BUCKET_NAME } from "./minioSetup.js";
 import path from 'path';
 import fs from 'fs';
 

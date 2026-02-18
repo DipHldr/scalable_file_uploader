@@ -14,7 +14,7 @@ const worker=new Worker('video-processing',async(job)=>{
     // const inputPath=job.data.file;
     const outputPath=`processed_data/${videoId}`;
 
-    //I have to create an API endpoint to serve the playlist URL to thye frontend
+    //I have to create an API endpoint to serve the playlist URL to the frontend
     const playlistUrl=`http://localhost:3000/videos/${videoId}/index.m3u8`;
 
     const remoteFileName=job.data.name;
