@@ -4,16 +4,22 @@ import { exec,spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import {ffmpeg_args} from './constants.js';
+import { downloadFromMinio } from './minio_utils/minioUtils.js';
 
 const connection=new IORedis({maxRetriesPerRequest:null});
 const worker=new Worker('video-processing',async(job)=>{
     // console.log(job);
 
     const videoId=job.data.name.split('.')[0];
-    const inputPath=job.data.file;
-    const outputPath=`processed/${videoId}`;
+    // const inputPath=job.data.file;
+    const outputPath=`processed_data/${videoId}`;
+
+    //I have to create an API endpoint to serve the playlist URL to thye frontend
     const playlistUrl=`http://localhost:3000/videos/${videoId}/index.m3u8`;
 
+    const remoteFileName=job.data.name;
+    const localDownloadPath=`raw_data/${remoteFileName.split('.')[0]}`
+    await downloadFromMinio(remoteFileName,localDownloadPath);
     //0->1080 1->720 2->480
     if (!fs.existsSync(outputPath)) {
         fs.mkdirSync(`${outputPath}/0`, { recursive: true });
@@ -23,7 +29,7 @@ const worker=new Worker('video-processing',async(job)=>{
 
     return new Promise((resolve,reject)=>{
 
-        const ffmpegProcess=spawn('ffmpeg',ffmpeg_args(inputPath,outputPath));
+        const ffmpegProcess=spawn('ffmpeg',ffmpeg_args(localDownloadPath,outputPath));
 
 
         // console.log('test ->\n',ffmpegProcess.stderr);

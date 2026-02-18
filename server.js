@@ -7,8 +7,10 @@ import path from 'path';
 import {v4 as uuidv4} from 'uuid'
 import cors from 'cors';
 import {Queue} from 'bullmq';
+import {storage,upload} from './multerConfig.js';
+import { uploadToMinio } from './minio_utils/minioUtils.js';
 const PORT=3000
-
+// const uploadToMinio=async(fileName,filePath)
 const app=express();
 app.use(express.static('public'));
 app.use(express.json());
@@ -25,36 +27,21 @@ const videoQueue=new Queue('video-processing',{
     }
 });
 
-//multer configuration
-const storage=multer.diskStorage({
-    destination:(req,file,cb)=>{
-        const uploadPath='./upload'
-        if(!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
-        cb(null,uploadPath);
-    },
-    filename:(req,file,cb)=>{
-        const unique_suffix=Date.now()+'_'+Math.round(Math.random() * 1E9);
-        const filename=file.fieldname+'_'+unique_suffix+path.extname(file.originalname)
-        cb(null,filename);
-    }
-});
-
-const upload=multer({
-    storage:storage,
-    limits:{fileSize : 100 * 1024 * 1024}
-});
-
-
 app.post('/api/v1/upload',upload.single('video'),async(req,res)=>{
     if(!req.file){
-        return res.status(201).json({message:'failed to upload file'});
+        return res.status(400).json({message:'failed to upload file'});
     }
+
 
     console.log('contents of req.file:\n', req.file)
 
+    const fileName=req.file.filename;
+    const filePath=req.file.path;
+    await uploadToMinio(fileName,filePath);
+
     await videoQueue.add('transcoder',{
-        file:req.file.path,
-        name:req.file.filename
+        file:filePath,
+        name:fileName
     },{
         attempts:3,
         backoff:1000

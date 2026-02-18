@@ -7,12 +7,12 @@ const uploadToMinio=async(fileName,filePath)=>{
         const metaData={
             'Content-Type':'video/mp4'
         }
-        const objInfo=await minioClient.fPutObject({
+        const objInfo=await minioClient.fPutObject(
             BUCKET_NAME,
             fileName,
             filePath,
             metaData
-        });
+        );
 
         console.log('From upload to minio',objInfo);
         return fileName
@@ -35,7 +35,7 @@ const downloadFromMinio=async(remoteFilename,localDownloadPath)=>{
         return localDownloadPath;
     } catch (error) {
         console.log("Error fetching file: ",error);
-        throw error;        
+        throw error;
     }
 }
 
