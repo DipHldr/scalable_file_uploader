@@ -21,7 +21,7 @@ A robust, production-ready system designed to handle large-scale video ingestion
 
 * **Resumable Chunks:** Uses the TUS protocol to resume uploads after network failure.
 
-* **Multipart Uploads:** Directly streams large files to storage.
+* **Multipart Uploads:** Efficient large file streaming directly to object storage.
 
 * **Worker-Based Transcoding:** Decouples uploading from processing using a message queue.
 
@@ -30,32 +30,32 @@ A robust, production-ready system designed to handle large-scale video ingestion
 * **Progress Tracking:** Real-time feedback via WebSockets or polling.
 
 
----
+##  High-Level Architecture
 
-## System Architecture
+The system is fully **stateless**, allowing API and worker services to scale independently.
 
-The workflow is fully **stateless**:
+###  Ingestion Layer
+- Express API receives high-resolution video via `Multer`
+- Streams payload directly to MinIO `raw/` bucket
+- Pushes a `transcode` job to BullMQ with object metadata
 
-1. **Ingestion**
+###  Job Orchestration
+- Redis-backed BullMQ queue
+- Job state transitions:
+  `Waiting → Active → Completed / Failed`
+- Automatic stalled-job detection
+- Configured retries with exponential backoff
 
-   * API receives file via Multer
-   * Streams upload to MinIO `raw/` bucket
+###  Distributed Processing
+- Worker pulls job from queue
+- Downloads asset from MinIO
+- Executes FFmpeg pipeline
+- Streams progress via `stderr` parsing
+- Uploads processed HLS assets to `processed/` bucket
 
-2. **Queuing**
-
-   * Job pushed to BullMQ containing only object name
-
-3. **Processing**
-
-   * Worker downloads raw file from MinIO
-   * FFmpeg converts to HLS segments
-   * Uploads processed output back to MinIO `processed/`
-
-4. **Delivery**
-
-   * Frontend streams `.m3u8` directly from MinIO or CDN
-
----
+###  Delivery
+- Frontend streams `.m3u8` master playlist
+- HLS segments (`.ts`) served via MinIO or CDN
 
 ## Tech Stack
 
@@ -67,9 +67,6 @@ The workflow is fully **stateless**:
 | Processing     | FFmpeg                | Video transcoding & segmentation   |
 | Infrastructure | Docker + WSL2         | Containerized runtime & fast I/O   |
 
----
-
----
 
 ## The Transcoding Pipeline (ABR)
 
