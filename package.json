@@ -2,27 +2,20 @@
   "name": "scalable_uploader",
   "version": "1.0.0",
   "description": "",
+  "private": true,
   "main": "index.js",
   "type": "module",
+  "workspaces": [
+    "services/api",
+    "services/worker",
+    "shared/minio_utils"
+  ],
   "scripts": {
-    "start": "concurrently -n SERVER,TRANSCODER -c blue,green \"npm run start:server\" \"npm run start:worker\"",
-    "start:server": "node server.js",
-    "start:worker": "node transcoder.js"
+    "dev": "docker-compose -f infra/docker-compose.yml up --build",
+    "test": "npm test --workspaces"
   },
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "bullmq": "^5.69.1",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "helmet": "^8.1.0",
-    "ioredis": "^5.9.3",
-    "jsonwebtoken": "^9.0.3",
-    "minio": "^8.0.6",
-    "morgan": "^1.10.1",
-    "multer": "^2.0.2",
-    "uuid": "^13.0.0"
-  },
   "devDependencies": {
     "concurrently": "^9.2.1"
   }

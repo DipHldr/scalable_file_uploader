@@ -1,16 +1,16 @@
 import {Client as MinioClient} from 'minio';
 
-const minioClient=new MinioClient({
-    endPoint:'127.0.0.1',
-    port:9000,
+export const minioClient=new MinioClient({
+    endPoint:process.env.MINIO_ENDPOINT||'127.0.0.1',
+    port:parseInt(process.env.MINIO_PORT)||9000,
     useSSL:false,
-    accessKey:'admin',
-    secretKey:'password123'
+    accessKey:process.env.MINIO_ROOT_USER||'admin',
+    secretKey:process.env.MINIO_ROOT_PASSWORD||'password123'
 });
 
-const BUCKET_NAME="video-uploader"
+export const BUCKET_NAME="video-uploader"
 
-;(async()=>{
+export const initMinio=async ()=>{
     try {
         const exists=await minioClient.bucketExists(BUCKET_NAME);
         if(!exists){
@@ -29,6 +29,4 @@ const BUCKET_NAME="video-uploader"
         }
     }
 
-})()
-
-export {minioClient,BUCKET_NAME};
+}

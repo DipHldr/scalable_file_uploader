@@ -4,7 +4,9 @@ import { exec,spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import {ffmpeg_args} from './constants.js';
-import { downloadFromMinio } from './minio_utils/minioUtils.js';
+import { downloadFromMinio,initMinio } from '@aether/shared-utils';
+
+await initMinio();
 
 const connection=new IORedis({maxRetriesPerRequest:null});
 const worker=new Worker('video-processing',async(job)=>{

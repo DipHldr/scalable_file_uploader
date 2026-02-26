@@ -3,3 +3,4 @@ upload
 processed
 raw_data
 processed_data
+*.env

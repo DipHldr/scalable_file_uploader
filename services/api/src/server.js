@@ -8,7 +8,9 @@ import {v4 as uuidv4} from 'uuid'
 import cors from 'cors';
 import {Queue} from 'bullmq';
 import {storage,upload} from './multerConfig.js';
-import { uploadToMinio } from './minio_utils/minioUtils.js';
+import { uploadToMinio,initMinio } from '@aether/shared-utils';
+
+await initMinio();
 const PORT=3000
 // const uploadToMinio=async(fileName,filePath)
 const app=express();
