@@ -1,6 +1,13 @@
+![Node](https://img.shields.io/badge/node-%3E%3D18-green)
+![Dockerized](https://img.shields.io/badge/docker-ready-blue)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 # Scalable Distributed Video Uploader
 
-A robust, production-ready system designed to handle large-scale video ingestion and processing.This high-performance, stateless pipeline implements **resumable uploads**, **multipart processing**, and **asynchronous transcoding** to ensure reliability and availability under heavy workloads. By decoupling compute-intensive media operations from the API layer using Object Storage (MinIO) and distributed job queues (BullMQ), the architecture enables scalable, fault-tolerant video handling suitable for real-world deployment.
+A production-ready video ingestion and processing system designed for large-scale workloads.
+
+The architecture supports resumable uploads, multipart transfer, and asynchronous transcoding, allowing the API layer to remain stateless while compute-intensive media operations are handled independently.
+
+By decoupling request handling from background processing using object storage (MinIO) and distributed job queues (BullMQ), the system achieves horizontal scalability, fault tolerance, and efficient resource utilization under sustained load.
 
 
 
@@ -32,7 +39,13 @@ A robust, production-ready system designed to handle large-scale video ingestion
 
 ##  High-Level Architecture
 
-The system is fully **stateless**, allowing API and worker services to scale independently.
+### Monorepo & Service Architecture
+The system is organized as a **high-performance monorepo** using npm workspaces. This enables a clean separation of concerns while maintaining a shared internal library for core utilities.
+
+- **`@aether/shared-utils`**: Internal workspace for MinIO clients, BullMQ configurations, and shared business logic.
+- **`services/api`**: Express.js producer service that handles file ingestion and job creation.
+- **`services/worker`**: Dedicated transcoding consumer service with a custom FFmpeg/spawn implementation.
+- **Container Orchestration**: Fully managed via Docker Compose for consistent networking and deployment.
 
 ###  Ingestion Layer
 - Express API receives high-resolution video via `Multer`
@@ -57,6 +70,20 @@ The system is fully **stateless**, allowing API and worker services to scale ind
 - Frontend streams `.m3u8` master playlist
 - HLS segments (`.ts`) served via MinIO or CDN
 
+## System Flow Diagram
+
+```mermaid
+flowchart LR
+    Client -->|Upload| API
+    API -->|Store Raw Video| MinIO
+    API -->|Create Job| Redis
+    Worker -->|Consume Job| Redis
+    Worker -->|Download Raw| MinIO
+    Worker -->|FFmpeg Transcode| HLS
+    Worker -->|Upload Processed| MinIO
+    Client -->|Stream .m3u8| MinIO
+  ```
+
 ## Tech Stack
 
 | Component      | Technology            | Role                               |
@@ -78,7 +105,6 @@ To provide a YouTube-like experience, this project implements **Adaptive Bitrate
 * **Mathematical Constraints:** Implemented scaling logic (`scale=w=trunc(oh*a/2)*2`) to ensure all dimensions are even, satisfying H.264 encoder requirements.
 * **HLS Segmentation:** Slices video into 10-second `.ts` chunks, enabling users to jump to any part of the video instantly without downloading the whole file.
 
----
 
 ## Distributed Worker Logic
 
@@ -89,67 +115,159 @@ The system is designed to be **fault-tolerant** and **memory-efficient**:
 * **Atomic Retries:** Configured with exponential backoff to handle transient issues like file-system locks or temporary CPU spikes.
 
 
+#  Quick Start — Dockerized Monorepo
 
----
+### Architecture Overview
 
-## Getting Started
+Services included:
 
-### Prerequisites
+- **Video API** — Handles upload requests
+- **Transcoding Worker** — Processes videos using FFmpeg
+- **Redis** — Queue / messaging layer
+- **MinIO** — Object storage (S3-compatible)
 
-* Node.js (v18+) or your preferred runtime
-* FFmpeg 
-* docker
-
-## Installation & Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone [https://github.com/your-username/scalable_file_uploader.git](https://github.com/your-username/scalable_file_uploader.git)
-   cd scalable-video-uploader
-   ```
+All services communicate internally using Docker service names (e.g., `http://minio:9000`).
 
 
-### Infrastructure (WSL / Docker)
-
-Start storage and queue layers:
+### 1. Clone the Repository
 
 ```bash
-# Start Redis
-docker run --name redis-server -p 6379:6379 -d redis
+git clone https://github.com/your-username/scalable_file_uploader.git
+cd scalable_file_uploader
+````
 
-# Start MinIO with persistent volume
-docker run -d \
-  -p 9000:9000 \
-  -p 9001:9001 \
-  --name minio \
-  -v ~/minio_data:/data \
-  -e "MINIO_ROOT_USER=admin" \
-  -e "MINIO_ROOT_PASSWORD=password123" \
-  minio/minio server /data --console-address ":9001"
+
+### 2. Environment Configuration
+
+Create a `.env` file in the project root:
+
+```env
+# -----------------------------
+# MinIO Configuration
+# -----------------------------
+MINIO_ENDPOINT=minio
+MINIO_ROOT_USER=demo_user
+MINIO_ROOT_PASSWORD=your_secure_password
+
+# -----------------------------
+# Redis Configuration
+# -----------------------------
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# -----------------------------
+# API Configuration
+# -----------------------------
+PORT=3000
 ```
 
----
+These variables are automatically injected into containers by Docker Compose.
 
-### Backend Setup
+
+### 3. Launch the Infrastructure
+
+From the project root:
 
 ```bash
-npm install
-
-# Start API server + transcoder worker
-npm run start
+docker-compose -f infra/docker-compose.yml up --build -d
 ```
 
+### What This Command Does
+
+*  Builds API and Worker images using the monorepo context
+*  Creates a private Docker network
+*  Enables internal service-to-service communication
+*  Mounts persistent volumes for MinIO
+*  Starts Redis for job queue handling
+
+Wait until logs show all services are healthy.
+
+
+### 4. Service Access Points
+
+| Service       | URL                                            | Credentials           |
+| ------------- | ---------------------------------------------- | --------------------- |
+| Video API     | [http://localhost:3000](http://localhost:3000) | N/A                   |
+| MinIO Console | [http://localhost:9001](http://localhost:9001) | `demo_user / your_secure_password` |
+| Redis         | localhost:6379                                 | N/A                   |
+
+
+### 5. Test the Processing Pipeline
+
+1. Open **Postman**
+2. Send a `POST` request to:
+
+```
+http://localhost:3000/api/v1/upload
+```
+
+3. Select **form-data**
+4. Add a key:
+
+   * `video` (type: File)
+   * Attach a video file
+
+
+### What Happens Next?
+
+1. API uploads the file to MinIO
+2. A job is pushed into Redis
+3. The Worker consumes the job
+4. FFmpeg starts transcoding
+5. Progress logs stream in real-time in your terminal
+
+
+### Stopping the Infrastructure
+
+To stop all services:
+
+```bash
+docker-compose -f infra/docker-compose.yml down
+```
+
+To remove volumes as well:
+
+```bash
+docker-compose -f infra/docker-compose.yml down -v
+```
+
+## Horizontal Scaling
+
+This architecture supports horizontal scaling out of the box.
+
+Because the API is stateless and workers consume from a shared Redis-backed BullMQ queue, we can scale services independently.
+
 ---
 
-## Environment Configuration
+### Scaling Worker Replicas
 
-| Variable       | Default   | Description                 |
-| -------------- | --------- | --------------------------- |
-| MINIO_ENDPOINT | 127.0.0.1 | MinIO API endpoint          |
-| REDIS_HOST     | 127.0.0.1 | Redis connection for BullMQ |
-| PORT           | 3000      | Express API port            |
+To increase transcoding throughput:
 
----
+```bash
+docker-compose -f infra/docker-compose.yml up --scale worker=3 -d
+```
+
+* This launches multiple worker containers consuming from the same queue.
+* Jobs are automatically distributed
+* No duplicate processing
+* BullMQ handles locking and concurrency
+
+we can verify running containers:
+```bash
+docker ps
+```
+
+## Scaling API Replicas
+```bash
+docker-compose -f infra/docker-compose.yml up --scale api=2 -d
+```
+
+##  Notes
+
+* All services are isolated inside Docker.
+* No external Redis or MinIO installation is required.
+* Internal communication uses container service names, not `localhost`.
+* Persistent storage ensures MinIO data survives container restarts.
 
 ## Transcoding Pipeline Details
 
@@ -166,7 +284,6 @@ Output:
 * Resolution Playlists
 * `.ts` Segments
 
----
 
 ## Important Notes for WSL Users
 
@@ -185,7 +302,6 @@ Restart WSL:
 wsl --shutdown
 ```
 
----
 
 ## Contributing
 * Contributions are welcome!
@@ -202,7 +318,6 @@ This project was built to explore real-world backend system design concepts:
 
 It serves as a foundation for scaling toward production-grade video platforms.
 
----
 
 ## License
 * Distributed under the MIT License. See LICENSE for more information.
