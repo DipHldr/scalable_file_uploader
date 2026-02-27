@@ -1,9 +1,7 @@
 {
   "name": "scalable_uploader",
   "version": "1.0.0",
-  "description": "",
   "private": true,
-  "main": "index.js",
   "type": "module",
   "workspaces": [
     "services/api",
@@ -11,7 +9,9 @@
     "shared/minio_utils"
   ],
   "scripts": {
-    "dev": "docker-compose -f infra/docker-compose.yml up --build",
+    "dev": "docker-compose -f infra/docker-compose.yml up --build -d",
+    "down":"docker-compose -f infra/docker-compose.yml down",
+    "logs":"docker-compose -f infra/docker-compose.yml logs -f",
     "test": "npm test --workspaces"
   },
   "author": "",

@@ -24,8 +24,8 @@ app.use(morgan('dev'))
 //connection to bullmq redis
 const videoQueue=new Queue('video-processing',{
     connection:{
-        host:'127.0.0.1',
-        port:6379
+        host:process.env.REDIS_HOST||'127.0.0.1',
+        port:process.env.REDIS_PORT||6379
     }
 });
 

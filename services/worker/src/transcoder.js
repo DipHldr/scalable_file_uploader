@@ -8,7 +8,11 @@ import { downloadFromMinio,initMinio } from '@aether/shared-utils';
 
 await initMinio();
 
-const connection=new IORedis({maxRetriesPerRequest:null});
+const connection=new IORedis({
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+    maxRetriesPerRequest:null
+});
 const worker=new Worker('video-processing',async(job)=>{
     // console.log(job);
 

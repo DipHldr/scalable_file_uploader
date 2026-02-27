@@ -1,0 +1,43 @@
+services:
+  minio:
+    image: minio/minio
+    container_name: minio_service
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - ../.env
+    command: server /data --console-address ":9001"
+    volumes: 
+      - minio_data:/data
+  
+  redis:
+    image: redis:alpine
+    container_name: redis_service
+    ports:
+      - "6379:6379"
+  api:
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+    container_name: api_service
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+      - minio
+  worker:
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+    container_name: worker_service
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+      - minio
+
+volumes:
+  minio_data:
