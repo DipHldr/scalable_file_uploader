@@ -1,4 +1,4 @@
-import { minioClient,BUCKET_NAME } from "./minioSetup.js";
+import { minioClient,BUCKET_NAME} from "../infra/src/minioSetup.js";
 import path from 'path';
 import fs from 'fs';
 
@@ -39,4 +39,34 @@ const downloadFromMinio=async(remoteFilename,localDownloadPath)=>{
     }
 }
 
-export {downloadFromMinio,uploadToMinio};
+const uploadDirectoryToMinio=async (dir,baseKey)=>{
+    const files=fs.readdirSync(dir,{withFileTypes:true});
+
+    for(const file of files){
+        const fullPath=path.join(dir,file.name);
+
+        if(file.isDirectory()){
+            await uploadDirectoryToMinio(dir,`${baseKey}/${file.name}`);
+        }
+        else{
+            const objectKey=`${baseKey}/${file.name}`;
+
+            await minioClient.fPutObject(
+                BUCKET_NAME,
+                objectKey,
+                fullPath
+            );
+            console.log("Uploaded:", objectKey);
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+export {downloadFromMinio,uploadToMinio,uploadDirectoryToMinio};

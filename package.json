@@ -4,19 +4,21 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "services/api",
-    "services/worker",
-    "shared/minio_utils"
+    "services/*",
+    "shared/*"
   ],
   "scripts": {
     "dev": "docker-compose -f infra/docker-compose.yml up --build -d",
-    "down":"docker-compose -f infra/docker-compose.yml down",
-    "logs":"docker-compose -f infra/docker-compose.yml logs -f",
+    "down": "docker-compose -f infra/docker-compose.yml down",
+    "logs": "docker-compose -f infra/docker-compose.yml logs -f",
     "test": "npm test --workspaces"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "pg": "^8.20.0"
   }
 }

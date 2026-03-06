@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_service
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data: /var/lib/postgresql/data
+    network:
+      - transcoder_net
+
   minio:
     image: minio/minio
     container_name: minio_service
@@ -10,12 +25,17 @@ services:
     command: server /data --console-address ":9001"
     volumes: 
       - minio_data:/data
+    network:
+      - transcoder_net
   
   redis:
     image: redis:alpine
     container_name: redis_service
     ports:
       - "6379:6379"
+    network:
+      - transcoder_net
+
   api:
     build:
       context: ..
@@ -26,8 +46,12 @@ services:
     env_file:
       - ../.env
     depends_on:
+      - db
       - redis
       - minio
+    network:
+      - transcoder_net
+
   worker:
     build:
       context: ..
@@ -36,8 +60,14 @@ services:
     env_file:
       - ../.env
     depends_on:
+      - db
       - redis
       - minio
-
+    network:
+      - transcoder_net
+network:
+  transcoder_net:
+    driver: bridge
 volumes:
   minio_data:
+  postgres_data:
