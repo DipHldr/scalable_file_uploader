@@ -3,5 +3,7 @@ upload
 processed
 raw_data
 processed_data
+demo.md
+todo.md
 *.env
 *.log

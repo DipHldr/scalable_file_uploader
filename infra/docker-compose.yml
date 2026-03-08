@@ -3,6 +3,8 @@ services:
     image: postgres:15-alpine
     container_name: postgres_service
     restart: always
+    env_file:
+      - ../.env
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -10,8 +12,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data: /var/lib/postgresql/data
-    network:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
       - transcoder_net
 
   minio:
@@ -25,7 +27,7 @@ services:
     command: server /data --console-address ":9001"
     volumes: 
       - minio_data:/data
-    network:
+    networks:
       - transcoder_net
   
   redis:
@@ -33,7 +35,7 @@ services:
     container_name: redis_service
     ports:
       - "6379:6379"
-    network:
+    networks:
       - transcoder_net
 
   api:
@@ -49,8 +51,20 @@ services:
       - db
       - redis
       - minio
-    network:
+    networks:
       - transcoder_net
+    develop:
+      watch:
+        - action: sync
+          path: ../services/api
+          target: /app/services/api
+          ignore:
+            - node_modules
+        - action: sync
+          path: ../shared
+          target: /app/shared
+        - action: rebuild
+          path: ../package.json
 
   worker:
     build:
@@ -63,9 +77,21 @@ services:
       - db
       - redis
       - minio
-    network:
+    networks:
       - transcoder_net
-network:
+    develop:
+      watch:
+        - action: sync
+          path: ../services/worker
+          target: /app/services/worker
+          ignore:
+            - node_modules
+        - action: sync
+          path: ../shared
+          target: /app/shared
+        - action: rebuild
+          path: ../package.json
+networks:
   transcoder_net:
     driver: bridge
 volumes:

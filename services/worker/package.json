@@ -2,7 +2,7 @@
   "name": "worker",
   "version": "1.0.0",
   "description": "",
-  "type":"module",
+  "type": "module",
   "main": "src/transcoder.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,12 +11,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aether/utils": "*",
     "@aether/infra": "*",
+    "@aether/utils": "*",
     "bullmq": "^5.70.1",
     "fluent-ffmpeg": "^2.1.3",
     "ioredis": "^5.9.3",
     "minio": "^8.0.6",
+    "pg": "^8.20.0",
     "uuid": "^13.0.0"
   }
 }

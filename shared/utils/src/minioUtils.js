@@ -1,21 +1,21 @@
-import { minioClient,BUCKET_NAME} from "../infra/src/minioSetup.js";
+import { minioClient,BUCKET_NAME} from "@aether/infra";
 import path from 'path';
 import fs from 'fs';
 
-const uploadToMinio=async(fileName,filePath)=>{
+const uploadToMinio=async(storageKey,filePath)=>{
     try {
         const metaData={
             'Content-Type':'video/mp4'
         }
         const objInfo=await minioClient.fPutObject(
             BUCKET_NAME,
-            fileName,
+            storageKey,
             filePath,
             metaData
         );
 
         console.log('From upload to minio',objInfo);
-        return fileName
+        return storageKey
     } catch (error) {
         console.log('error uploading file',error);
         throw error;        
@@ -61,12 +61,5 @@ const uploadDirectoryToMinio=async (dir,baseKey)=>{
     }
 
 }
-
-
-
-
-
-
-
 
 export {downloadFromMinio,uploadToMinio,uploadDirectoryToMinio};
