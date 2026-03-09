@@ -11,7 +11,6 @@ COPY services/worker/package*.json ./services/worker/
 RUN npm install
 
 COPY shared/ ./shared/
-COPY infra/migrations/ ./infra/migrations/
 COPY services/worker/ ./services/worker/
 
 WORKDIR /app/services/worker

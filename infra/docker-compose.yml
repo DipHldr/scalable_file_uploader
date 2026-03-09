@@ -51,6 +51,10 @@ services:
       - db
       - redis
       - minio
+    volumes:
+      - ../services/api/temp/uploads:/app/services/api/temp/uploads
+      - ../infra/migrations:/app/infra/migrations
+      - ../shared:/app/shared
     networks:
       - transcoder_net
     develop:
@@ -77,6 +81,10 @@ services:
       - db
       - redis
       - minio
+    volumes:
+      - ../services/worker/temp/raw:/app/services/worker/temp/raw
+      - ../services/worker/temp/processed:/app/services/worker/temp/processed
+      - ../shared:/app/shared
     networks:
       - transcoder_net
     develop:

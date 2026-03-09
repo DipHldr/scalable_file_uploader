@@ -13,6 +13,7 @@ import {fileURLToPath} from 'url';
 await initMinio();
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
+
 const connection=new IORedis({
     host: process.env.REDIS_HOST || '127.0.0.1',
     port: process.env.REDIS_PORT || 6379,
@@ -28,7 +29,7 @@ const worker=new Worker('video-processing',async(job)=>{
     //I have to create an API endpoint to serve the playlist URL to the frontend
     // const playlistUrl=`http://localhost:3000/videos/${videoId}/index.m3u8`;
     
-    const rootDir=path.resolve(__dirname,'../..');
+    const rootDir=path.resolve(__dirname,'../.');
     const localDownloadPath=path.resolve(rootDir,'temp/raw',job.data.name);
     const remoteFileName=job.data.storageKey;
     const outputPath=path.join(rootDir,'temp/processed',videoId);
