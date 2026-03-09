@@ -39,6 +39,8 @@ const downloadFromMinio=async(remoteFilename,localDownloadPath)=>{
     }
 }
 
+//await uploadDirectoryToMinio(storageKey,outputPath);
+
 const uploadDirectoryToMinio=async (dir,baseKey)=>{
     const files=fs.readdirSync(dir,{withFileTypes:true});
 
@@ -46,7 +48,7 @@ const uploadDirectoryToMinio=async (dir,baseKey)=>{
         const fullPath=path.join(dir,file.name);
 
         if(file.isDirectory()){
-            await uploadDirectoryToMinio(dir,`${baseKey}/${file.name}`);
+            await uploadDirectoryToMinio(fullPath,`${baseKey}/${file.name}`);
         }
         else{
             const objectKey=`${baseKey}/${file.name}`;

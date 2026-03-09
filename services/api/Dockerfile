@@ -9,6 +9,7 @@ COPY services/api/package*.json ./services/api/
 RUN npm install
 
 COPY shared/ ./shared/
+COPY infra/migrations/ ./infra/migrations/
 COPY services/api/ ./services/api/
 
 WORKDIR /app/services/api

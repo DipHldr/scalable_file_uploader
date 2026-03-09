@@ -13,7 +13,7 @@ export const runMigrations = async () =>{
         );
     `);
     const migrationsDir = path.resolve(__dirname,'../../../infra/migrations');
-    const files = fs.readdirSync(migrationsDir).sort();
+    const files = fs.readFileSync(migrationsDir).sort();
 
     for(const file of files){
         const {rowCount}=await pool.query(
