@@ -8,7 +8,7 @@ router.post('/videos',upload.single('video'),uploadVideo);
 // router.get('/videos')//--> get list of al videos
 // router.get('/videos/:id/playlist')//-->serve the hls playlist url
 // router.get('/videos/:id')//-->give video detail by id 
-// router.patch('/videos/:id/status')//-->update video status
+// router.get('/videos/:id/status')//-->update video status
 // router.delete('/videos/:id') //--> delete a video
 
 //trancoding jobs..

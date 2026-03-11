@@ -3,12 +3,11 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 # Scalable Distributed Video Uploader
 
-A production-ready video ingestion and processing system designed for large-scale workloads.
+A production-ready video ingestion and processing system architected for high-throughput workloads.
 
-The architecture supports resumable uploads, multipart transfer, and asynchronous transcoding, allowing the API layer to remain stateless while compute-intensive media operations are handled independently.
+The system implements a decoupled, event-driven architecture using MinIO (S3-compatible storage) and BullMQ (Redis-backed queue). By offloading compute-intensive transcoding to independent workers, the API remains highly responsive.
 
-By decoupling request handling from background processing using object storage (MinIO) and distributed job queues (BullMQ), the system achieves horizontal scalability, fault tolerance, and efficient resource utilization under sustained load.
-
+A key feature is the Transactional Integrity Layer powered by PostgreSQL, which synchronizes file storage, database metadata, and job enqueuing into atomic operations. This ensures fault tolerance and prevents data inconsistency (Ghost Jobs) across the distributed services, even under sustained network or hardware
 
 
 
@@ -40,17 +39,38 @@ By decoupling request handling from background processing using object storage (
 ##  High-Level Architecture
 
 ### Monorepo & Service Architecture
-The system is organized as a **high-performance monorepo** using npm workspaces. This enables a clean separation of concerns while maintaining a shared internal library for core utilities.
+The system is organized as a high-performance monorepo using npm workspaces. This architecture decouples the entry points (API) from the heavy compute (Worker) and the persistence layer (Postgres).
 
-- **`@aether/shared-utils`**: Internal workspace for MinIO clients, BullMQ configurations, and shared business logic.
-- **`services/api`**: Express.js producer service that handles file ingestion and job creation.
-- **`services/worker`**: Dedicated transcoding consumer service with a custom FFmpeg/spawn implementation.
-- **Container Orchestration**: Fully managed via Docker Compose for consistent networking and deployment.
+* @aether/infra: Internal workspace for database migrations and shared connection pooling logic for PostgreSQL.
 
-###  Ingestion Layer
-- Express API receives high-resolution video via `Multer`
-- Streams payload directly to MinIO `raw/` bucket
-- Pushes a `transcode` job to BullMQ with object metadata
+* @aether/utils: Core logic for MinIO object streaming and BullMQ queue definitions.
+
+* **services/api:** Express.js producer service. It acts as the gateway for video ingestion and executes the Atomic Handoff—a transactional sequence that synchronizes Postgres records with Redis job states.
+
+* **services/worker:** Dedicated transcoding consumer. It implements a "Claim & Process" pattern, pulling raw assets from MinIO and reporting real-time status updates back to the central database.
+
+* **Docker Compose:** Orchestrates the interaction between the Node.js services and the infrastructure backbone (Postgres, Redis, and MinIO).
+
+### Ingestion Layer
+The flow has been hardened to ensure data integrity:
+
+1. **Request Reception**  
+   API receives high-resolution video via Multer.
+
+2. **Metadata Intent**  
+   An initial record is created in Postgres with an `uploading` status.
+
+3. **Storage Transfer**  
+   Payload is streamed directly to the MinIO `raw/` bucket.
+
+4. **Atomic Handoff**
+
+   - Opens a dedicated Postgres client connection.
+   - Updates video status to `pending`.
+   - Inserts a new row in `transcoding_jobs` with a link to the video.
+   - Pushes the transcode job to BullMQ using the `videoId` as a unique `jobId`.
+   - Captures the BullMQ ID and stores it in Postgres.
+   - Commits the transaction only if all steps succeed.
 
 ###  Job Orchestration
 - Redis-backed BullMQ queue
@@ -58,6 +78,60 @@ The system is organized as a **high-performance monorepo** using npm workspaces.
   `Waiting → Active → Completed / Failed`
 - Automatic stalled-job detection
 - Configured retries with exponential backoff
+
+### Reliability & Atomicity
+
+This pipeline is designed with reliability as a first-class concern. Instead of treating the database, storage layer, and queue as loosely connected steps, the system performs a **coordinated handoff** between them to prevent inconsistent states.
+
+At the core of this design is a **PostgreSQL transaction boundary** that ensures critical state transitions happen atomically from the application's perspective. During the upload flow, the system:
+
+1. Creates the video metadata record.
+2. Registers a transcoding job entry.
+3. Enqueues the processing task in the BullMQ queue.
+
+These steps form a **controlled commit point** for the pipeline. If any stage fails—such as the queue being unavailable, the job enqueue operation failing, or an unexpected runtime error—the transaction is **rolled back entirely**. This guarantees that partial states do not persist in the database.
+
+### Why this matters
+
+Without transactional coordination, distributed systems commonly suffer from the **dual-write problem**, where multiple subsystems are updated independently. A failure between those updates can lead to inconsistent states such as:
+
+- **Orphaned jobs** – queue tasks referencing database records that never committed.
+- **Zombie records** – database rows indicating work exists, but no worker will ever process them.
+- **Silent data loss** – tasks that should exist but were never enqueued.
+
+By enforcing a transactional boundary around the metadata and job creation logic, the system ensures the following invariant:
+Either:
+```
+(video record + transcoding job + queue task exist)
+```
+Or:
+none of them exist
+
+
+### Failure Handling
+
+If the queue layer (BullMQ / Redis) becomes unavailable during the enqueue operation:
+
+
+enqueue fails
+↓
+transaction rollback
+↓
+no video state transition committed
+
+
+This prevents the pipeline from entering an inconsistent state where the database believes work exists but no worker will ever receive it.
+
+### Operational Benefits
+
+This approach provides several practical reliability guarantees:
+
+- **Strong consistency at job creation time**
+- **No zombie or orphaned records**
+- **Safe retries from the API layer**
+- **Clear failure semantics for monitoring and observability**
+
+In practice, this pattern acts as a **bulletproof handoff between persistence and asynchronous processing**, ensuring that every accepted upload is either fully scheduled for processing or cleanly rejected without leaving behind inconsistent system state.
 
 ###  Distributed Processing
 - Worker pulls job from queue
@@ -73,15 +147,17 @@ The system is organized as a **high-performance monorepo** using npm workspaces.
 ## System Flow Diagram
 
 ```mermaid
-flowchart LR
-    Client -->|Upload| API
-    API -->|Store Raw Video| MinIO
-    API -->|Create Job| Redis
-    Worker -->|Consume Job| Redis
-    Worker -->|Download Raw| MinIO
-    Worker -->|FFmpeg Transcode| HLS
-    Worker -->|Upload Processed| MinIO
-    Client -->|Stream .m3u8| MinIO
+  flowchart TD
+    Client -->|1. Upload| API
+    API -->|2. Record Intent| Postgres
+    API -->|3. Store Raw| MinIO
+    API -->|4. Atomic Enqueue| Redis
+    Redis -->|5. Claim Job| Worker
+    Worker -->|6. Log Progress| Postgres
+    Worker -->|7. Process| FFmpeg
+    Worker -->|8. Store HLS| MinIO
+    Client -->|9. Poll Status| API
+    API -->|10. Fetch Status| Postgres
   ```
 
 ## Tech Stack
@@ -93,6 +169,7 @@ flowchart LR
 | Message Queue  | Redis + BullMQ        | Job scheduling & worker management |
 | Processing     | FFmpeg                | Video transcoding & segmentation   |
 | Infrastructure | Docker + WSL2         | Containerized runtime & fast I/O   |
+| Persistence    | PostgresSQL           | Source of Truth for video metadata and job audit logs|
 
 
 ## The Transcoding Pipeline (ABR)
@@ -114,6 +191,20 @@ The system is designed to be **fault-tolerant** and **memory-efficient**:
 * **Stream-Based Processing:** We use Node.js `spawn` rather than `exec`. This allows us to pipe FFmpeg's `stderr` to track progress in real-time while maintaining a flat memory footprint (no RAM buffering).
 * **Atomic Retries:** Configured with exponential backoff to handle transient issues like file-system locks or temporary CPU spikes.
 
+* **Idempotent Job IDs:** Uses `videoId` as the BullMQ `jobId`, ensuring that the same video cannot be scheduled for transcoding more than once. This provides natural **concurrency control** and prevents duplicate processing even if the API retries or multiple workers attempt to enqueue the same task.
+
+* **Self-Healing Retries:** Workers implement **exponential backoff retry logic**. If a worker pod crashes or is terminated mid-transcode, BullMQ automatically returns the job to the queue and retries it after a delay. This allows the system to recover gracefully from transient failures such as container restarts, node crashes, or temporary resource exhaustion.
+
+* **Zombie Detection (Upcoming):** Planned monitoring logic will periodically scan for jobs stuck in a `processing` state beyond an expected timeout window. These **zombie jobs**—often caused by abrupt container exits or unhandled worker crashes—will be automatically reset or re-queued to ensure the pipeline continues processing without manual intervention.
+
+
+# Key API Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| POST | `/api/v1/videos` | Ingests a raw video file, stores metadata, and triggers the transcoding pipeline. |
+| GET | `/api/v1/videos/:id` | Returns video metadata including title, status, and the generated HLS playlist URL for streaming. |
+| GET | `/api/v1/videos/:id/status` | Provides real-time processing status and transcoding progress for the video. |
 
 #  Quick Start — Dockerized Monorepo
 
@@ -132,7 +223,7 @@ All services communicate internally using Docker service names (e.g., `http://mi
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/scalable_file_uploader.git
+git clone https://github.com/DipHldr/scalable_file_uploader.git
 cd scalable_file_uploader
 ````
 
@@ -148,6 +239,17 @@ Create a `.env` file in the project root:
 MINIO_ENDPOINT=minio
 MINIO_ROOT_USER=demo_user
 MINIO_ROOT_PASSWORD=your_secure_password
+
+# -----------------------------
+# PostgreSQL Credentials
+# -----------------------------
+DB_USER=user
+DB_PASSWORD=password
+DB_NAME=database_name
+DB_PORT=port_number
+
+# DB Connection Host
+DB_HOST=db
 
 # -----------------------------
 # Redis Configuration
@@ -171,6 +273,19 @@ From the project root:
 ```bash
 docker-compose -f infra/docker-compose.yml up --build -d
 ```
+OR you can do this if .env doesnt load in the **docker-compose.yml**
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml watch
+```
+
+any way i have already added a few of these in the monorepo root script
+```bash
+npm run dev //-->standard image build 
+OR 
+npm run watch //--> runs in watch mode
+OR
+npm run down //--> deletes the containers
+```
 
 ### What This Command Does
 
@@ -185,20 +300,19 @@ Wait until logs show all services are healthy.
 
 ### 4. Service Access Points
 
-| Service       | URL                                            | Credentials           |
-| ------------- | ---------------------------------------------- | --------------------- |
-| Video API     | [http://localhost:3000](http://localhost:3000) | N/A                   |
-| MinIO Console | [http://localhost:9001](http://localhost:9001) | `demo_user / your_secure_password` |
-| Redis         | localhost:6379                                 | N/A                   |
-
-
+| Service        | URL                                             | Credentials                         |
+| -------------- | ----------------------------------------------- | ----------------------------------- |
+| Video API      | http://localhost:3000                          | N/A                                 |
+| MinIO Console  | http://localhost:9001                          | `demo_user / your_secure_password`  |
+| Redis          | localhost:6379                                 | N/A                                 |
+| PostgreSQL     | localhost:5432                                 | `postgres / your_secure_password`   |
 ### 5. Test the Processing Pipeline
 
 1. Open **Postman**
 2. Send a `POST` request to:
 
 ```
-http://localhost:3000/api/v1/upload
+http://localhost:3000/api/v1/videos
 ```
 
 3. Select **form-data**
@@ -268,6 +382,7 @@ docker-compose -f infra/docker-compose.yml up --scale api=2 -d
 * No external Redis or MinIO installation is required.
 * Internal communication uses container service names, not `localhost`.
 * Persistent storage ensures MinIO data survives container restarts.
+* Performance Note: The system is configured with a Postgres connection pool (max: 20) and optimized for high-ingress metadata handling by keeping database transactions as short as possible (sub-50ms), decoupling them from the long-running binary uploads
 
 ## Transcoding Pipeline Details
 

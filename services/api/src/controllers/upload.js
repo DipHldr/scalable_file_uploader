@@ -38,7 +38,7 @@ export const uploadVideo=async(req,res)=>{
             VALUES ($1,$2,$3,'uploading') RETURNING id`,
             [fileName,req.file.originalname,storageKey]
         );
-
+        
         videoId=videoEntry.rows[0].id;
 
         await uploadToMinio(storageKey,absoluteFilePath);
