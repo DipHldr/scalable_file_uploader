@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "dev": "docker-compose -f infra/docker-compose.yml up --build -d",
-    "down": "docker-compose -f infra/docker-compose.yml down",
+    "down": "docker-compose -f infra/docker-compose.yml down -v",
     "logs": "docker-compose -f infra/docker-compose.yml logs -f",
-    "watch":"docker compose --env-file .env -f infra/docker-compose.yml watch",
+    "watch":"docker-compose --env-file .env -f infra/docker-compose.yml watch",
     "test": "npm test --workspaces"
   },
   "author": "",
