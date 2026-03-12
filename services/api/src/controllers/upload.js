@@ -54,12 +54,10 @@ export const uploadVideo=async(req,res)=>{
             await client.query('BEGIN');
             await client.query(`UPDATE videos SET status='pending' WHERE id=$1`,[videoId]);
             await client.query(`INSERT INTO transcoding_jobs (video_id,status) VALUES ($1,'pending')`,[videoId]);
-            //TODO add a outbox table to handle the dual write problem
-            await client.query('COMMIT');
             
             const job=await videoQueue.add('transcoder',{
                 videoId,
-                storageKey:storageKey,
+                storageKey,
                 name:fileName
             },{
                 jobId:videoId,
@@ -67,11 +65,13 @@ export const uploadVideo=async(req,res)=>{
                 backoff:5000,
                 removeOnComplete:true
             });
-
+            
             await client.query(`UPDATE transcoding_jobs SET bullmq_job_id=$1 WHERE video_id=$2`,
                 [job.id,videoId]
             );
-
+            
+            //TODO add a outbox table to handle the dual write problem
+            await client.query('COMMIT');
             
         } catch (err) {
             await client.query('ROLLBACK');

@@ -11,7 +11,7 @@
     "dev": "docker-compose -f infra/docker-compose.yml up --build -d",
     "down": "docker-compose -f infra/docker-compose.yml down",
     "logs": "docker-compose -f infra/docker-compose.yml logs -f",
-    "watch":"docker compose -f infra/docker-compose.yml watch",
+    "watch":"docker compose --env-file .env -f infra/docker-compose.yml watch",
     "test": "npm test --workspaces"
   },
   "author": "",

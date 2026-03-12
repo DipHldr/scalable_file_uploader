@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS transcoding_jobs(
     worker_id TEXT,
     priority INTEGER DEFAULT 1,
     progress INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'pending',
+    status TEXT DEFAULT 'pending' CHECK (status IN ('processing','completed','pending','failed')),
     error_message TEXT,
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
