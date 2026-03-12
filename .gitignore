@@ -4,5 +4,6 @@ processed
 raw_data
 processed_data
 todo.md
+Notes.md
 *.env
 *.log

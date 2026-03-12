@@ -44,7 +44,7 @@ export const uploadVideo=async(req,res)=>{
         await uploadToMinio(storageKey,absoluteFilePath);
 
         if(fs.existsSync(absoluteFilePath)){
-            await fs.promises.unlinkSync(absoluteFilePath);
+            await fs.promises.unlink(absoluteFilePath);
         }
 
         const client=await pool.connect();

@@ -13,7 +13,7 @@ export const runMigrations = async () =>{
         );
     `);
     const migrationsDir = path.resolve(__dirname,'../../../infra/migrations');
-    const files = fs.readFileSync(migrationsDir).sort();
+    const files = fs.readdirSync(migrationsDir).sort();
 
     for(const file of files){
         const {rowCount}=await pool.query(
@@ -23,7 +23,7 @@ export const runMigrations = async () =>{
         if(rowCount === 0){
             console.log(`Applying migrations ${file}`);
 
-            const sql=fs.readdirSync(path.join(migrationsDir,file),'utf8');
+            const sql=fs.readFileSync(path.join(migrationsDir,file),'utf8');
 
             const client = await pool.connect();
 

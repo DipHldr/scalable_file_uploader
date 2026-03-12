@@ -4,11 +4,10 @@ import IORedis from 'ioredis';
 import { exec,spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import {ffmpeg_args} from './constants.js';
-import { initMinio, pool} from '@aether/infra';
 import {downloadFromMinio,uploadDirectoryToMinio} from '@aether/utils';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import { pool } from '@aether/infra';
+import { initMinio,pool } from '@aether/infra';
 
 
 await initMinio();
@@ -32,9 +31,9 @@ const worker=new Worker('video-processing',async(job)=>{
     let claim;
     for(let i=0;i<3;i++){
         claim=await pool.query(
-            `UPDATE transcoding_jobs SET status='processing, started_at=NOW(),
+            `UPDATE transcoding_jobs SET status='processing', started_at=NOW(),
              worker_id=$1 WHERE video_id=$2 AND status='pending' RETURNING id`,
-            [workerId,videoId,]
+            [workerId,videoId]
         );
 
         if(claim.rowCount>0)break;
@@ -54,7 +53,7 @@ const worker=new Worker('video-processing',async(job)=>{
     
     const rootDir=path.resolve(__dirname,'../..');
     const localDownloadPath=path.resolve(rootDir,'temp/raw',job.data.name);
-    const remoteFileName=job.data.storageKey;
+    // const remoteFileName=job.data.storageKey;
     const outputPath=path.join(rootDir,'temp/processed',videoId);
     const outputStorageKey=`videos/processed/${videoId}`
     
@@ -71,7 +70,7 @@ const worker=new Worker('video-processing',async(job)=>{
 
     try {
 
-        await downloadFromMinio(remoteFileName,localDownloadPath);
+        await downloadFromMinio(storageKey,localDownloadPath);
 
         return new Promise((resolve,reject)=>{
 
@@ -99,12 +98,12 @@ const worker=new Worker('video-processing',async(job)=>{
             ffmpegProcess.on('close', async (code) => {
                 if (code === 0) {
                     console.log('FFmpeg finished successfully');
-                    await uploadDirectoryToMinio(outputStorageKey,outputPath);
+                    await uploadDirectoryToMinio(outputPath,outputStorageKey);
                     const hls_url=`${outputStorageKey}/index.m3u8`;
 
                     
                     await client.query('BEGIN');
-                    await client.query(`UPDATE videos SET status='completed', hls_url=$1 WHERE id=$2`,{hls_url,videoId});
+                    await client.query(`UPDATE videos SET status='completed', hls_url=$1 WHERE id=$2`,[hls_url,videoId]);
                     await client.query(`UPDATE transcoding_jobs SET status='completed', completed_at=NOW() WHERE video_id=$1`,[videoId]);
                     await client.query('COMMIT');
 
@@ -138,7 +137,5 @@ const worker=new Worker('video-processing',async(job)=>{
         await client.query(`UPDATE transcoding_jobs SET status='failed',error_message=$1 WHERE video_id=$2`,[error.message,videoId]);
         throw error;        
     }
-
-    
 
 },{connection, concurrency:1})
