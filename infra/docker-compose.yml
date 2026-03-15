@@ -45,6 +45,8 @@ services:
     container_name: api_service
     ports:
       - "3000:3000"
+    cpus: 1.0           
+    mem_limit: 1024mb
     env_file:
       - ../.env
     depends_on:
@@ -74,6 +76,8 @@ services:
     build:
       context: ..
       dockerfile: services/worker/Dockerfile
+    cpus: 1         
+    mem_limit: 1024mb
     env_file:
       - ../.env
     depends_on:

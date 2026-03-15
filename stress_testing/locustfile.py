@@ -45,7 +45,7 @@ class ArcaneVideoUser(HttpUser):
                 'title': f"Stress Test Video {unique_id}"
             }
 
-            with self.client.post("/api/v1/videos", data=data, files=files, catch_response=True) as response:
+            with self.client.post("/api/v1/videos/upload", data=data, files=files, catch_response=True) as response:
                 if response.status_code == 200:
                     response.success()
                 else:

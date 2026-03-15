@@ -16,7 +16,8 @@ const videoQueue=new Queue('video-processing',{
 
 export const uploadVideo=async(req,res)=>{
     console.log("Hello from server\n");
-    let videoId;
+    console.log(req.file);
+    let videoId,absoluteFilePath;
 
     try {
 
@@ -29,7 +30,7 @@ export const uploadVideo=async(req,res)=>{
 
         const fileName=req.file.filename;
 
-        const absoluteFilePath=path.resolve(req.file.path);
+        absoluteFilePath=path.resolve(req.file.path);
 
         const storageKey=`videos/raw/${fileName}`;
 
@@ -43,9 +44,7 @@ export const uploadVideo=async(req,res)=>{
 
         await uploadToMinio(storageKey,absoluteFilePath);
 
-        if(fs.existsSync(absoluteFilePath)){
-            await fs.promises.unlink(absoluteFilePath);
-        }
+        
 
         const client=await pool.connect();
         try {
@@ -55,7 +54,18 @@ export const uploadVideo=async(req,res)=>{
             await client.query(`UPDATE videos SET status='pending' WHERE id=$1`,[videoId]);
             await client.query(`INSERT INTO transcoding_jobs (video_id,status) VALUES ($1,'pending')`,[videoId]);
             
-            const job=await videoQueue.add('transcoder',{
+            //TODO add a outbox table to handle the dual write problem
+            await client.query('COMMIT');
+            
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        }finally{
+            client.release();
+        }
+
+
+        const job=await videoQueue.add('transcoder',{
                 videoId,
                 storageKey,
                 name:fileName
@@ -69,16 +79,6 @@ export const uploadVideo=async(req,res)=>{
             await client.query(`UPDATE transcoding_jobs SET bullmq_job_id=$1 WHERE video_id=$2`,
                 [job.id,videoId]
             );
-            
-            //TODO add a outbox table to handle the dual write problem
-            await client.query('COMMIT');
-            
-        } catch (err) {
-            await client.query('ROLLBACK');
-            throw err;
-        }finally{
-            client.release();
-        }
 
 
         return res.status(200).json({
@@ -91,7 +91,7 @@ export const uploadVideo=async(req,res)=>{
         });
         
     } catch (error) {
-        console.log(error);
+        console.log('Upload failed: ',error);
 
         if(videoId){
             await pool.query(`UPDATE videos SET status='failed'WHERE id=$1`,[videoId]);
@@ -104,6 +104,17 @@ export const uploadVideo=async(req,res)=>{
             error:error.message
         });
         
+    }
+    finally{
+        if(absoluteFilePath&&fs.existsSync(absoluteFilePath)){
+            try {
+                await fs.promises.unlink(absoluteFilePath);
+            } catch (unlinkError) {
+                console.log('Cleanup failed\n');
+                console.log(`Cleaup Failed for: ${absoluteFilePath}, Error: ${unlinkError}`);
+            }
+        }
+
     }
     
 }

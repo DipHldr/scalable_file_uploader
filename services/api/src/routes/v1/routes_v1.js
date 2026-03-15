@@ -6,7 +6,7 @@ import { getPlaylist } from '../../controllers/getPlaylist.js';
 const router=express.Router();
 
 //videos
-router.post('/videos',upload.single('video'),uploadVideo);
+router.post('/videos/upload',upload.single('video'),uploadVideo);
 router.get('/videos',getListOfAllVideos);//--> get list of al videos
 router.get('/videos/:id/playlist',getPlaylist)//-->serve the hls playlist url
 // router.get('/videos/:id')//-->give video detail by id 
