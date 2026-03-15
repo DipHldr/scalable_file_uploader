@@ -1,4 +1,4 @@
-![Node](https://img.shields.io/badge/node-%3E%3D18-green)
+![Node](https://img.shields.io/badge/node-%3E%3D20-green)
 ![Dockerized](https://img.shields.io/badge/docker-ready-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 # Scalable Distributed Video Uploader
