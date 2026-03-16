@@ -9,6 +9,7 @@ The system implements a decoupled, event-driven architecture using MinIO (S3-com
 
 A key feature is the Transactional Integrity Layer powered by PostgreSQL, which synchronizes file storage, database metadata, and job enqueuing into atomic operations. This ensures fault tolerance and prevents data inconsistency (Ghost Jobs) across the distributed services, even under sustained network or hardware
 
+![Architecture Diagram](./assets/transcoder_architecture_101.png)
 
 
 ## Features
